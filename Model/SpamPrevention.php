@@ -7,6 +7,8 @@
  */
 class CountryCheck_Model_SpamPrevention extends XFCP_CountryCheck_Model_SpamPrevention
 {
+    const API_NAME = 'ip-api';
+
     public function _allowRegistration(array $user, Zend_Controller_Request_Http $request)
     {
         $decisions = parent::_allowRegistration($user, $request);
@@ -20,7 +22,7 @@ class CountryCheck_Model_SpamPrevention extends XFCP_CountryCheck_Model_SpamPrev
         $decision = XenForo_Model_SpamPrevention::RESULT_ALLOWED;
 
         if ($this->_isEnabled()) {
-            $countryCode = $this->_getGeoIpApiResponse($user);
+            $countryCode = $this->_getUserCountryCode($user);
 
             $whitelistCountries = $this->_getWhitelist();
             $blacklistCountries = $this->_getBlacklist();
@@ -53,46 +55,80 @@ class CountryCheck_Model_SpamPrevention extends XFCP_CountryCheck_Model_SpamPrev
         return $decision;
     }
 
-    protected function _getGeoIpApiUrl(array $user)
+    protected function _getUserCountryCode(array $user)
     {
-        $base_url = "http://api.ipstack.com/";
-        $api_key = $this->_getApiKey();
-
-        return $base_url . $user['ip'] . '?access_key=' . $api_key;
-    }
-
-    protected function _getGeoIpApiResponse(array $user)
-    {
-        if (!$user['ip']) {
+        if (!(isset($user['ip']) && !empty($user['ip']))) {
             return false;
         }
 
-        $apiUrl = $this->_getGeoIpApiUrl($user);
+        $ip = $user['ip'];
+
+        switch (self::API_NAME) {
+            case 'ipstack':
+                return $this->_getIpstackResponse($ip);
+            case 'ip-api':
+                return $this->_getIpApiResponse($ip);
+        }
+    }
+
+    protected function _getIpstackResponse(string $ip)
+    {
+        $base_url = "http://api.ipstack.com/";
+        $api_key = $this->_getApiKey();
+        $apiUrl = $base_url . $ip . '?access_key=' . $api_key;
+
         $client = XenForo_Helper_Http::getClient($apiUrl);
+        
         try
         {
             $response = $client->request('GET');
             $body = $response->getBody();
 
-            return $this->_decodeGoeIpApiData($body);
+            $response = @json_decode($body, true);
+            
+            if (is_array($response) && isset($response['country_code']) && strlen($response['country_code']) === 2) {
+                return strtoupper($response['country_code']);
+            } else {
+                return false;
+            }
         }
         catch (Zend_Http_Exception $e)
         {
             //XenForo_Error::logException($e, false);
             return false;
         }
+        catch (Exception $e)
+        {
+            return false;
+        }
     }
-
-    protected function _decodeGoeIpApiData($data)
+    
+    protected function _getIpApiResponse(string $ip)
     {
+        // TODO: Add support for PRO accounts
+        // $api_key = $this->_getApiKey();
+        $base_url = "http://ip-api.com/json/";
+        $apiUrl = $base_url . $ip . '?fields=countryCode,status,message';
+
+        $client = XenForo_Helper_Http::getClient($apiUrl);
+        
         try
         {
-            $response = json_decode($data, true);
-            if (is_array($response) && isset($response['country_code']) && strlen($response['country_code']) === 2) {
-                return strtoupper($response['country_code']);
+            $response = $client->request('GET');
+            $body = $response->getBody();
+
+            $response = @json_decode($body, true);
+            
+            if (is_array($response) && isset($response['countryCode']) && strlen($response['countryCode']) === 2) {
+                return strtoupper($response['countryCode']);
             } else {
                 return false;
             }
+        }
+        catch (Zend_Http_Exception $e)
+        {
+            //XenForo_Error::logException($e, false);
+            return false;
         }
         catch (Exception $e)
         {

@@ -4,14 +4,13 @@ user that tries to register from a not whitelisted country will be sent to the m
 Any user that try to register from a blacklisted country will be denied from complete the account creation.
 
 ## Geo IP
-Geo IP is accomplished with the favor of [ipstack.io](https://ipstack.io) 
-you need to create an account (starting from free) in order to get an API key.
+Geo IP is accomplished with the favor of [ip-api.com](https://ip-api.com) 
 
 ## Configuration
 You can customize the options of this add-on from the admin of XenForo (country check options group):
 
 - Enabled: Enable/Disable country check on registration
-- API key: Enter here your ipstack.io API key
+- API key: (Optional) Enter here your ip-api.com API key (Not used at this moment)
 - Whitelist: Any user that register from a whitelisted country will be automatically approved (if he pass every other spam prevention system that you have enabled on your system)
 - Blacklist: Any user that register from a blacklisted country will be automatically denied from complete registration
 
